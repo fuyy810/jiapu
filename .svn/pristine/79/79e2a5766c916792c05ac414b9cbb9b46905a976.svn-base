@@ -1,0 +1,145 @@
+<template>
+  <div class="app-container">
+    <el-card class="box-card">
+      <el-form ref="dataForm" :rules="rules" :model="dataForm" label-width="150px" style="width:900px">
+        <h3>家族谱文</h3>
+        <el-form-item label="谱文名称" prop="title">
+          <el-input v-model="dataForm.title" placeholder="" />
+        </el-form-item>
+        <el-form-item label="作者" prop="author">
+          <el-input v-model="dataForm.author" placeholder="" />
+        </el-form-item>
+        <el-form-item label="时间" prop="publishTime">
+          <el-input v-model="dataForm.publishTime" placeholder="" />
+        </el-form-item>
+        <el-form-item label="类别" prop="catalog">
+          <el-select v-model="dataForm.catalog" class="filter-item" placeholder="请选择">
+            <el-option v-for="item in catalogList" :key="item.id" :label="item.name" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="谱文内容" type="textarea" prop="zibei">
+          <el-tabs v-model="activeName">
+            <el-tab-pane label="今文" name="first">
+              <tinymce v-model="dataForm.contentNew" :height="500" />
+            </el-tab-pane>
+            <el-tab-pane label="古文" name="second">
+              <tinymce v-model="dataForm.contentOld" :height="500" />
+            </el-tab-pane>
+            <el-tab-pane label="对照" name="third">
+              <tinymce v-model="dataForm.contentContrast" :height="500" />
+            </el-tab-pane>
+          </el-tabs>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <div class="op-container" style="margin-top:20px;">
+      <el-button @click="handleCancel">取消</el-button>
+      <el-button type="primary" @click="handleUpdate">提交</el-button>
+    </div>
+
+  </div>
+</template>
+
+<script>
+import { detailFamilyArticle, updateFamilyArticle } from '@/api/family-article'
+import Tinymce from '@/components/Tinymce'
+
+const catalogMap = {
+  4: '其他',
+  3: '家谱编修',
+  2: '家谱树成员',
+  1: '家族资料'
+}
+
+export default {
+  name: 'FamilyArticleDetail',
+  filters: {
+    catalogFilter(catalog) {
+      return catalogMap[catalog]
+    }
+  },
+  components: { Tinymce },
+  data() {
+    return {
+      rules: {
+        // title: [
+        //   { required: true, message: '请输入家族标题', trigger: 'blur' }
+        // ],
+        // surname: [
+        //   { required: true, message: '请输入家族姓氏', trigger: 'blur' }
+        // ]
+      },
+      catalogList: [
+        { 'id': 1, 'name': '谱序' },
+        { 'id': 2, 'name': '凡例' },
+        { 'id': 3, 'name': '传记' }
+      ],
+      dataForm: {
+        id: undefined,
+        title: '',
+        catalog: 1,
+        author: '',
+        publishTime: '',
+        contentNew: '',
+        contentOld: '',
+        contentContrast: ''
+      },
+      downloadLoading: false,
+      activeName: 'first'
+    }
+  },
+  created() {
+    this.init()
+  },
+  methods: {
+    init: function() {
+      if (this.$route.query.id == null) {
+        return
+      }
+      const familyArticleId = this.$route.query.id
+      detailFamilyArticle({
+        familyArticleId: familyArticleId
+      })
+        .then(response => {
+          console.log(response.data)
+          this.dataForm = response.data
+        })
+        .catch(() => {
+        })
+    },
+    handleCancel: function() {
+      this.$router.push({ path: '/family/article' })
+    },
+    handleUpdate: function() {
+      this.$refs['dataForm'].validate(valid => {
+        if (valid) {
+          delete this.dataForm.createTime
+          delete this.dataForm.updateTime
+          updateFamilyArticle(this.dataForm)
+            .then(response => {
+              console.log(response)
+              this.$notify.success({
+                title: '成功',
+                message: '修改谱文成功'
+              })
+              this.$router.push({ path: '/family/article' })
+            })
+            .catch(response => {
+              this.$notify.error({
+                title: '失败',
+                message: '修改谱文失败'
+              })
+            })
+        }
+      })
+    }
+  }
+}
+</script>
+
+<style scoped>
+  .idcard{
+    width: 400px;
+  }
+</style>

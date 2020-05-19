@@ -1,0 +1,192 @@
+<template>
+  <div class="app-container">
+
+    <!-- 查询和其他操作 -->
+    <div class="filter-container">
+      <el-input v-model="listQuery.keywords" clearable class="filter-item" style="width: 300px;" placeholder="输入名字或ID查找" />
+      <el-button class="filter-item" type="primary" icon="el-icon-search" @click="handleFilter">查找</el-button>
+      <el-button class="filter-item" type="primary" @click="handleRefresh()">刷新</el-button>
+      <el-button class="filter-item" type="primary" @click="handleDownload()">导出</el-button>
+    </div>
+
+    <!-- 查询结果 -->
+    <el-table v-loading="listLoading" :data="list" size="small" element-loading-text="正在查询中。。。" border fit highlight-current-row>
+      <el-table-column align="center" width="100px" label="ID" prop="familySn" sortable />
+
+      <el-table-column align="center" label="姓氏" prop="lastName" />
+
+      <el-table-column align="center" label="名字" prop="firstName" />
+
+      <el-table-column align="center" label="性别" prop="gender">
+        <template slot-scope="scope">
+          {{ scope.row.gender | genderFilter }}
+        </template>
+      </el-table-column>
+
+      <el-table-column align="center" label="生日" prop="birthday" />
+
+      <el-table-column align="center" label="籍贯" prop="origin" />
+
+      <el-table-column align="center" label="绑定微信" prop="nickname" />
+
+      <el-table-column align="center" label="审核状态" prop="status">
+        <template slot-scope="scope">
+          {{ scope.row.status | statusFilter }}
+        </template>
+      </el-table-column>
+
+      <el-table-column align="center" label="操作" width="300" class-name="small-padding fixed-width">
+        <template slot-scope="scope">
+          <el-button type="primary" size="small" @click="handleView(scope.row)">详细资料</el-button>
+          <el-button v-if="scope.row.status === 1" type="danger" size="small" @click="handleDelete(scope.row)">解绑</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <pagination v-show="total>0" :total="total" :page.sync="listQuery.page" :limit.sync="listQuery.limit" @pagination="getList" />
+
+  </div>
+</template>
+
+<script>
+import { userList, unbundleMember, memberListAll } from '@/api/member'
+import Pagination from '@/components/Pagination' // Secondary package based on el-pagination
+
+const statusMap = {
+  1: '已通过',
+  0: '--',
+  2: '--'
+}
+
+const genderMap = {
+  2: '女',
+  1: '男',
+  0: '未知'
+}
+
+export default {
+  name: 'MemberList',
+  components: { Pagination },
+  filters: {
+    statusFilter(status) {
+      return statusMap[status]
+    },
+    genderFilter(gender) {
+      return genderMap[gender]
+    }
+  },
+  data() {
+    return {
+      list: null,
+      listAll: null,
+      total: 0,
+      listLoading: true,
+      listQuery: {
+        page: 1,
+        limit: 20,
+        keywords: undefined,
+        status: '',
+        familyId: 0
+      },
+      downloadLoading: false
+    }
+  },
+  created() {
+    this.listQuery.familyId = sessionStorage.getItem('familyId')
+    this.getList()
+    this.getListAll()
+  },
+  methods: {
+    getList() {
+      this.listLoading = true
+      userList(this.listQuery).then(response => {
+        this.list = response.data.data
+        this.total = response.data.total
+        this.listLoading = false
+      }).catch(() => {
+        this.list = []
+        this.total = 0
+        this.listLoading = false
+      })
+    },
+    getListAll() {
+      const query = {
+        familyId: this.listQuery.familyId
+      }
+      memberListAll(query).then(response => {
+        this.listAll = response.data
+      }).catch(() => {
+        this.listAll = []
+      })
+    },
+    handleFilter() {
+      this.listQuery.page = 1
+      this.getList()
+    },
+    handleRefresh() {
+      this.listQuery.page = 1
+      this.listQuery.limit = 20
+      this.listQuery.keywords = undefined
+      this.getList()
+    },
+    handleDownload() {
+      import('@/vendor/Export2Excel').then(excel => {
+        const tHeader = ['家族ID', '世代', '姓氏', '名字', '性别', '父亲ID', '母亲ID', '配偶ID', '籍贯', '健在', '生日（公历）', '生日（农历）', '卒日（公历）', '卒日（农历）', '妻子序', '父子序', '生父ID', '生父名', '过继', '排行', '字', '号', '他名', '教育（科举）', '职业（官职）', '生平简介及其他', '配偶情况', '子女情况', '墓地位置', '家族委员', '手机号']
+        const filterVal = ['familySn', 'generation', 'lastName', 'firstName', 'gender', 'fatherSn', 'motherSn', 'partnerSn', 'origin', 'alive', 'birthday', 'lunar', 'deathday', 'dieday', 'qizixu', 'fuzixu', 'biogFaId', 'biogFaName', 'adoptive', 'paihang', 'zi', 'hao', 'alias', 'education', 'profession', 'introduction', 'partner', 'children', 'cemeteryPlace', 'role', 'phone']
+        excel.export_json_to_excel2(tHeader, this.listAll, filterVal, '家族成员信息')
+        this.downloadLoading = false
+      })
+    },
+    formatJson(filterVal, jsonData) {
+      return jsonData.map(v => filterVal.map(j => {
+        if (j === 'alive') {
+          if (v[j] === 1) {
+            return '是'
+          } else {
+            return '否'
+          }
+        } else if (j === 'role') {
+          if (v[j] === 1) {
+            return '是'
+          } else {
+            return '否'
+          }
+        } else if (j === 'adoptive') {
+          if (v[j] === 1) {
+            return '是'
+          } else {
+            return '否'
+          }
+        } else {
+          return v[j]
+        }
+      }))
+    },
+    handleUpdate(row) {
+      this.$router.push({ path: '/family/detail', query: { id: row.id }})
+    },
+    handleView(row) {
+      this.$router.push({ path: '/member/info', query: { id: row.id }})
+    },
+    handleDelete(row) {
+      const query = {
+        userId: row.id
+      }
+      unbundleMember(query)
+        .then(response => {
+          this.$notify.success({
+            title: '成功',
+            message: '解绑成功'
+          })
+          this.getList()
+        })
+        .catch(response => {
+          this.$notify.error({
+            title: '失败',
+            message: '解绑失败'
+          })
+        })
+    }
+  }
+}
+</script>
